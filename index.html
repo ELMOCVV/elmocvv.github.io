@@ -210,6 +210,19 @@
       gap: clamp(10px, 3vw, 18px);
       padding: 14px 0 0;
       max-width: 100%;
+      transition: opacity 0.26s ease, transform 0.26s ease;
+    }
+    .grid.grid--cat-hiding {
+      opacity: 0;
+      transform: translateY(6px);
+      pointer-events: none;
+    }
+    @keyframes gridCatIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .grid.grid--cat-enter {
+      animation: gridCatIn 0.32s ease-out both;
     }
     .card {
       background: var(--app-card-bg);
@@ -258,8 +271,62 @@
       .grid { grid-template-columns: 1fr; }
     }
 
+    @media (prefers-reduced-motion: reduce) {
+      .product-gallery-frame img,
+      .product-thumbs button,
+      .size-option,
+      .grid {
+        transition: none !important;
+        animation: none !important;
+      }
+      .grid.grid--cat-enter {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+      }
+      .grid.grid--cat-hiding {
+        opacity: 1 !important;
+        transform: none !important;
+      }
+      #view-catalog,
+      #view-product {
+        transition: none !important;
+        animation: none !important;
+      }
+      #view-catalog.main-view-in,
+      #view-product.main-view-in {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+      }
+      #view-catalog.main-view-out,
+      #view-product.main-view-out {
+        opacity: 1 !important;
+      }
+    }
+
     .view-hidden {
       display: none !important;
+    }
+
+    /* Перехід каталог ↔ картка товару */
+    #view-catalog,
+    #view-product {
+      transition: opacity 0.26s ease;
+    }
+    #view-catalog.main-view-out,
+    #view-product.main-view-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    @keyframes mainViewIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    #view-catalog.main-view-in,
+    #view-product.main-view-in {
+      animation: mainViewIn 0.34s ease-out both;
+      transition: none;
     }
 
     .product-back {
@@ -326,6 +393,8 @@
       object-position: center;
       display: block;
       margin: 0;
+      opacity: 1;
+      transition: opacity 0.28s ease;
     }
     .product-thumbs {
       display: flex;
@@ -345,9 +414,13 @@
       background: var(--app-secondary-bg);
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
+      transition: border-color 0.22s ease, transform 0.2s ease;
     }
     .product-thumbs button.is-active {
       border-color: var(--app-accent);
+    }
+    .product-thumbs button:active {
+      transform: scale(0.97);
     }
     .product-thumb-frame {
       display: block;
@@ -401,7 +474,7 @@
       font-size: 15px;
       text-align: left;
       cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
+      transition: border-color 0.24s ease, background 0.24s ease;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
@@ -572,14 +645,59 @@
       let selSize = 0;
       const root = document.getElementById('product-detail-root');
 
+      function syncThumbState() {
+        root.querySelectorAll('[data-thumb]').forEach((b) => {
+          const j = +b.getAttribute('data-thumb');
+          const on = j === selImg;
+          b.classList.toggle('is-active', on);
+          b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+      }
+
+      function syncSizeState() {
+        root.querySelectorAll('[data-size]').forEach((b) => {
+          const j = +b.getAttribute('data-size');
+          const on = j === selSize;
+          b.classList.toggle('is-selected', on);
+          b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+      }
+
+      function swapMainImageWithFade() {
+        const main = document.getElementById('product-main-img');
+        if (!main) return;
+        const nextSrc = images[selImg];
+        if (main.getAttribute('data-src-key') === nextSrc) return;
+        const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduceMotion) {
+          main.src = nextSrc;
+          main.setAttribute('data-src-key', nextSrc);
+          return;
+        }
+        main.style.opacity = '0';
+        const loader = new Image();
+        loader.onload = () => {
+          main.src = nextSrc;
+          main.setAttribute('data-src-key', nextSrc);
+          requestAnimationFrame(() => {
+            main.style.opacity = '1';
+          });
+        };
+        loader.onerror = () => {
+          main.src = nextSrc;
+          main.setAttribute('data-src-key', nextSrc);
+          main.style.opacity = '1';
+        };
+        loader.src = nextSrc;
+      }
+
       function renderDetail() {
-        const sz = sizes[selSize];
         root.innerHTML = `
           <h1>${escHtml(p.name)}</h1>
           <p class="product-desc">${escHtml(p.description)}</p>
           <div class="product-gallery-main">
             <div class="product-gallery-frame">
-              <img id="product-main-img" src="${escHtml(images[selImg])}" alt="${escHtml(p.name)}" decoding="async" sizes="100vw">
+              <img id="product-main-img" src="${escHtml(images[selImg])}" alt="${escHtml(p.name)}" decoding="async" sizes="100vw" data-src-key="${escHtml(images[selImg])}">
             </div>
           </div>
           <div class="product-thumbs" role="tablist" aria-label="Галерея">
@@ -605,14 +723,17 @@
 
         root.querySelectorAll('[data-thumb]').forEach((btn) => {
           btn.addEventListener('click', () => {
-            selImg = +btn.getAttribute('data-thumb');
-            renderDetail();
+            const i = +btn.getAttribute('data-thumb');
+            if (i === selImg) return;
+            selImg = i;
+            syncThumbState();
+            swapMainImageWithFade();
           });
         });
         root.querySelectorAll('[data-size]').forEach((btn) => {
           btn.addEventListener('click', () => {
             selSize = +btn.getAttribute('data-size');
-            renderDetail();
+            syncSizeState();
           });
         });
         root.querySelector('#product-buy-btn').addEventListener('click', () => {
@@ -638,16 +759,49 @@
       const activeBtn = btn || document.querySelector(`nav button[data-cat="${cat}"]`);
       if (activeBtn) activeBtn.classList.add('active');
       const grid = document.getElementById('products');
-      grid.innerHTML = '';
-      products[cat].forEach((p, i) => {
-        const img = demoPhotoUrl(cat, i, p.name);
-        const altAttr = escHtml(p.name);
-        grid.innerHTML += `
+
+      const buildCards = () => {
+        grid.innerHTML = '';
+        products[cat].forEach((p, i) => {
+          const img = demoPhotoUrl(cat, i, p.name);
+          const altAttr = escHtml(p.name);
+          grid.innerHTML += `
           <div class="card">
             <img src="${img}" alt="${altAttr}" loading="lazy" decoding="async">
             <h3>${escHtml(p.name)}</h3>
             <button type="button" data-open-product="${cat}:${i}">Переглянути</button>
           </div>`;
+        });
+      };
+
+      if (!grid.dataset.catPrimed) {
+        grid.dataset.catPrimed = '1';
+        buildCards();
+        return;
+      }
+
+      const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduceMotion) {
+        buildCards();
+        return;
+      }
+
+      grid.classList.remove('grid--cat-enter');
+      const onHideEnd = (e) => {
+        if (e.target !== grid || e.propertyName !== 'opacity') return;
+        grid.removeEventListener('transitionend', onHideEnd);
+        buildCards();
+        grid.classList.remove('grid--cat-hiding');
+        grid.classList.add('grid--cat-enter');
+        const onEnterEnd = () => {
+          grid.classList.remove('grid--cat-enter');
+          grid.removeEventListener('animationend', onEnterEnd);
+        };
+        grid.addEventListener('animationend', onEnterEnd);
+      };
+      grid.addEventListener('transitionend', onHideEnd);
+      requestAnimationFrame(() => {
+        grid.classList.add('grid--cat-hiding');
       });
     }
 
