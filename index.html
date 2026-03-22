@@ -266,6 +266,36 @@
     }
     .card button:active { filter: brightness(0.95); }
 
+    .grid.grid--empty {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 18px;
+    }
+    .catalog-empty {
+      max-width: 340px;
+      margin: 0 auto;
+      padding: 22px 20px 26px;
+      text-align: center;
+      background: var(--app-card-bg);
+      border: 1px dashed var(--app-border);
+      border-radius: 16px;
+      color: var(--app-text);
+      box-shadow: 0 1px 6px var(--app-card-shadow);
+    }
+    .catalog-empty-title {
+      margin: 0 0 10px;
+      font-size: clamp(16px, 4vw, 18px);
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .catalog-empty-text {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.55;
+      opacity: 0.82;
+    }
+
     /* Очень узкие экраны — одна колонка читается лучше */
     @media (max-width: 340px) {
       .grid { grid-template-columns: 1fr; }
@@ -559,8 +589,10 @@
   <!-- Навигация -->
   <nav>
     <button type="button" class="active" data-cat="top" onclick="showCategory('top', this)">🔥 Топ продажів</button>
-    <button type="button" data-cat="men" onclick="showCategory('men', this)">👔 Для нього</button>
-    <button type="button" data-cat="women" onclick="showCategory('women', this)">💎 Для неї</button>
+    <button type="button" data-cat="portraits" onclick="showCategory('portraits', this)">Портрети 👤</button>
+    <button type="button" data-cat="couples" onclick="showCategory('couples', this)">Пари 💑</button>
+    <button type="button" data-cat="family" onclick="showCategory('family', this)">Сімейні 👨‍👩‍👧‍👦</button>
+    <button type="button" data-cat="pets" onclick="showCategory('pets', this)">З улюбленцем 🐾</button>
   </nav>
 
   <!-- Товары -->
@@ -583,35 +615,41 @@
       return Array.isArray(sizes) && sizes.length > 0 && sizes.every((s) => s && s.preview);
     }
 
-    const products = {
-      top: [
-        {
-          name: 'Олійний портрет',
-          description: 'Портрет олійними фарбами з вашого фото: глибокий колір і жива фактура на полотні.',
-          images: ['img/pic_1/post_1.png', 'img/pic_1/post_2.png', 'img/pic_1/post_3.png']
-        },
-        { name: 'Картина №2', description: 'Спокійна гама для вітальні чи спальні. Друк на полотні преміум-якості.' },
-        { name: 'Картина №3', description: 'Сучасний мотив, стійкі фарби. Легко поєднується з мінімалістичним інтер’єром.' },
-        { name: 'Картина №4', description: 'Насичені кольори та чітка деталізація. Ідеально як акцент на стіні.' },
-        { name: 'Картина №5', description: 'М’які переходи та глибина кадру. Підходить для офісу чи дому.' },
-        { name: 'Картина №6', description: 'Обмежена серія. Кожен розмір — окремий настрій для простору.' }
-      ],
-      men: [
-        { name: 'Пейзаж для нього', description: 'Стриманий пейзаж у холодних тонах. Для кабінету та робочого кутка.' },
-        { name: 'Абстракція для нього', description: 'Геометрія та контраст без зайвого шуму. Сильний акцент у просторі.' },
-        { name: 'Мінімалізм для нього', description: 'Чисті лінії, спокійна палітра. Універсальний подарунок.' },
-        { name: 'Портрет для нього', description: 'Стильна обробка, фокус на настрої. Можна замовити індивідуально.' },
-        { name: 'Геометрія для нього', description: 'Ритм і баланс форм. Добре виглядає поруч з деревом та металом у декорі.' },
-        { name: 'Нічне місто для нього', description: 'Вогні міста, атмосфера вечора. Глибокі тони для сучасного інтер’єру.' }
-      ],
-      women: [
-        { name: 'Квіти для неї', description: 'Ніжна композиція, теплі відтінки. Освіжить спальню чи зону відпочинку.' },
-        { name: 'Пастель для неї', description: 'М’які кольори та легкий настрій. Гармонійно з текстилем та світлом.' },
-        { name: 'Вінтаж для неї', description: 'Ретро-настрій із сучасною якістю друку. Елегантний акцент.' },
-        { name: 'Мрія для неї', description: 'Ефірна композиція, багато повітря на полотні. Для натхненного простору.' },
-        { name: 'Світанок для неї', description: 'Тепле світло та спокій. Підійде до світлих стін і натуральних матеріалів.' },
-        { name: 'Золото для неї', description: 'Витончені акценти та глибокий фон. Вечірній настрій у кадрі.' }
+    const PRODUCT_OIL_PORTRAIT = {
+      name: 'Олійний портрет',
+      description: 'Олія на полотні з вашого фото: насичений колір, об’єм мазка та чітка деталізація — як у класичному портреті.',
+      images: [
+        'img/category/portrait/oil/1_oil.png',
+        'img/category/portrait/oil/2_oil.png',
+        'img/category/portrait/oil/3_oil.png'
       ]
+    };
+
+    const PRODUCT_ECHO_CHILDHOOD = {
+      name: 'Ехо дитинства',
+      description: 'Одне полотно: ви зараз і ви маленькі поруч — ніби зустріч дорослого «я» з дитинством в одному кадрі.',
+      images: [
+        'img/category/portrait/eho/1.png',
+        'img/category/portrait/eho/2.png',
+        'img/category/portrait/eho/3.png'
+      ]
+    };
+
+    const PRODUCT_WITH_PET = {
+      name: 'З пухнастим другом',
+      description: 'Портрет разом із вашим чотирилапим: тепло, затишно й з любов’ю до всього сімейства, включно з хвостиками.',
+      images: [
+        'img/category/pats/pat_1/1.png',
+        'img/category/pats/pat_1/2.png'
+      ]
+    };
+
+    const products = {
+      top: [PRODUCT_OIL_PORTRAIT, PRODUCT_ECHO_CHILDHOOD, PRODUCT_WITH_PET],
+      portraits: [PRODUCT_OIL_PORTRAIT, PRODUCT_ECHO_CHILDHOOD],
+      couples: [],
+      family: [],
+      pets: [PRODUCT_WITH_PET]
     };
 
     /** Різні стабільні фото (Lorem Picsum) за seed; w×h за замовчуванням квадрат для карток каталогу */
@@ -875,7 +913,19 @@
 
       const buildCards = () => {
         grid.innerHTML = '';
-        products[cat].forEach((p, i) => {
+        const list = products[cat] || [];
+        grid.classList.toggle('grid--empty', list.length === 0);
+
+        if (!list.length) {
+          grid.innerHTML = `
+            <div class="catalog-empty" role="status">
+              <p class="catalog-empty-title">Тут поки ні душі… ну майже 🎨</p>
+              <p class="catalog-empty-text">Розділ у розробці — готуємо нові картини. Загляніть згодом або оберіть іншу категорію.</p>
+            </div>`;
+          return;
+        }
+
+        list.forEach((p, i) => {
           const img = (p.images && p.images[0]) ? p.images[0] : demoPhotoUrl(cat, i, p.name);
           const altAttr = escHtml(p.name);
           grid.innerHTML += `
