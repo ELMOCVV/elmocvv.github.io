@@ -489,6 +489,20 @@
       white-space: nowrap;
     }
 
+    .size-preview-wrap {
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--app-secondary-bg);
+      border: 1px solid var(--app-border);
+      margin-bottom: 20px;
+    }
+    .size-preview-wrap img {
+      display: block;
+      width: 100%;
+      height: auto;
+      transition: opacity 0.22s ease;
+    }
+
     .product-buy {
       width: 100%;
       margin-top: 4px;
@@ -546,10 +560,14 @@
 
   <script>
     const DEFAULT_SIZES = [
-      { label: '30×40 см', price: 890 },
-      { label: '50×70 см', price: 1590 },
-      { label: '70×100 см', price: 2490 }
+      { label: '45×55 см', price: 1100, preview: 'img/size/45х55.png' },
+      { label: '55×65 см (стандарт)', price: 1500, preview: 'img/size/55х65.png' },
+      { label: '60×70 см', price: 2100, preview: 'img/size/60х70.png' }
     ];
+
+    function sizesHavePreviews(sizes) {
+      return Array.isArray(sizes) && sizes.length > 0 && sizes.every((s) => s && s.preview);
+    }
 
     const products = {
       top: [
@@ -648,7 +666,7 @@
         : productGalleryUrls(cat, index, p.name);
       const sizes = p.sizes || DEFAULT_SIZES;
       let selImg = 0;
-      let selSize = 0;
+      let selSize = sizes.length > 1 ? 1 : 0;
       const root = document.getElementById('product-detail-root');
 
       function syncThumbState() {
@@ -667,6 +685,40 @@
           b.classList.toggle('is-selected', on);
           b.setAttribute('aria-selected', on ? 'true' : 'false');
         });
+        syncSizePreview();
+      }
+
+      function syncSizePreview() {
+        const imgEl = document.getElementById('size-preview-img');
+        if (!imgEl || !sizesHavePreviews(sizes)) return;
+        const s = sizes[selSize];
+        const nextSrc = s && s.preview;
+        if (!nextSrc) return;
+        if (imgEl.getAttribute('data-src-key') === nextSrc) return;
+        const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduceMotion) {
+          imgEl.src = nextSrc;
+          imgEl.setAttribute('data-src-key', nextSrc);
+          imgEl.alt = `Приклад розміру ${s.label}`;
+          return;
+        }
+        imgEl.style.opacity = '0.65';
+        const loader = new Image();
+        loader.onload = () => {
+          imgEl.src = nextSrc;
+          imgEl.setAttribute('data-src-key', nextSrc);
+          imgEl.alt = `Приклад розміру ${s.label}`;
+          requestAnimationFrame(() => {
+            imgEl.style.opacity = '1';
+          });
+        };
+        loader.onerror = () => {
+          imgEl.src = nextSrc;
+          imgEl.setAttribute('data-src-key', nextSrc);
+          imgEl.alt = `Приклад розміру ${s.label}`;
+          imgEl.style.opacity = '1';
+        };
+        loader.src = nextSrc;
       }
 
       function swapMainImageWithFade() {
@@ -724,6 +776,12 @@
               </button>
             `).join('')}
           </div>
+          ${sizesHavePreviews(sizes) ? `
+          <p class="product-section-title">Приклад розміру в інтер’єрі</p>
+          <div class="size-preview-wrap">
+            <img id="size-preview-img" src="${escHtml(sizes[selSize].preview)}" alt="Приклад розміру ${escHtml(sizes[selSize].label)}" decoding="async" sizes="100vw" data-src-key="${escHtml(sizes[selSize].preview)}">
+          </div>
+          ` : ''}
           <button type="button" class="product-buy" id="product-buy-btn" aria-label="Замовити в Telegram">${escHtml('Замовити')}</button>
         `;
 
