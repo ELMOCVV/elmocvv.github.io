@@ -553,7 +553,11 @@
 
     const products = {
       top: [
-        { name: 'Картина №1', description: 'Яскрава абстракція, акрил на полотні. Готова до підвісу, рама за бажанням.' },
+        {
+          name: 'Олійний портрет',
+          description: 'Портрет олійними фарбами з вашого фото: глибокий колір і жива фактура на полотні.',
+          images: ['img/pic_1/post_1.png', 'img/pic_1/post_2.png', 'img/pic_1/post_3.png']
+        },
         { name: 'Картина №2', description: 'Спокійна гама для вітальні чи спальні. Друк на полотні преміум-якості.' },
         { name: 'Картина №3', description: 'Сучасний мотив, стійкі фарби. Легко поєднується з мінімалістичним інтер’єром.' },
         { name: 'Картина №4', description: 'Насичені кольори та чітка деталізація. Ідеально як акцент на стіні.' },
@@ -639,7 +643,9 @@
       const p = list && list[index];
       if (!p) return;
 
-      const images = productGalleryUrls(cat, index, p.name);
+      const images = (p.images && p.images.length)
+        ? p.images.slice()
+        : productGalleryUrls(cat, index, p.name);
       const sizes = p.sizes || DEFAULT_SIZES;
       let selImg = 0;
       let selSize = 0;
@@ -763,7 +769,7 @@
       const buildCards = () => {
         grid.innerHTML = '';
         products[cat].forEach((p, i) => {
-          const img = demoPhotoUrl(cat, i, p.name);
+          const img = (p.images && p.images[0]) ? p.images[0] : demoPhotoUrl(cat, i, p.name);
           const altAttr = escHtml(p.name);
           grid.innerHTML += `
           <div class="card">
