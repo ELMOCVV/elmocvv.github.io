@@ -6,19 +6,32 @@
   <meta name="theme-color" content="#ffffff">
   <title>Art Studio AI</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      function initialTheme() {
+        try {
+          var stored = localStorage.getItem('artstudio-theme');
+          if (stored === 'light' || stored === 'dark') return stored;
+          var tg = window.Telegram && window.Telegram.WebApp;
+          if (tg && tg.colorScheme === 'dark') return 'dark';
+          if (tg && tg.colorScheme === 'light') return 'light';
+          if (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+        } catch (e) { /* приватний режим тощо */ }
+        return 'light';
+      }
+      document.documentElement.setAttribute('data-theme', initialTheme());
+    })();
+  </script>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
 
-    /*
-      Палітра інтерфейсу: за замовчуванням брендова (як на звичайному сайті).
-      У мініапці Telegram інакше підставляє --tg-theme-*, через що все «пливе».
-      Режим follow: у скрипті PALETTE_FOLLOW_TELEGRAM = true — кольори з теми TG.
-    */
-    :root {
+    /* Дві фіксовані бренд-теми; активна — через data-theme на <html> */
+    html[data-theme="light"] {
       --app-bg: #ffffff;
       --app-text: #222222;
       --app-accent: #005c9c;
+      --app-accent-hover: #004a7a;
       --app-secondary-bg: #f9f9f9;
       --app-card-bg: #fdfdfd;
       --app-border: #eeeeee;
@@ -26,11 +39,29 @@
       --app-on-accent: #ffffff;
       --app-welcome: #005c9c;
       --app-card-shadow: rgba(0, 0, 0, 0.06);
+      --app-theme-switch-bg: #f0f3f6;
+      --app-theme-switch-muted: rgba(34, 34, 34, 0.45);
+    }
+    html[data-theme="dark"] {
+      --app-bg: #161a1f;
+      --app-text: #e8eaef;
+      --app-accent: #3d9fd4;
+      --app-accent-hover: #5cb3e0;
+      --app-secondary-bg: #1f242c;
+      --app-card-bg: #232a33;
+      --app-border: #343c48;
+      --app-border-nav: #2c333d;
+      --app-on-accent: #ffffff;
+      --app-welcome: #6ec5ff;
+      --app-card-shadow: rgba(0, 0, 0, 0.35);
+      --app-theme-switch-bg: #252b34;
+      --app-theme-switch-muted: rgba(232, 234, 239, 0.45);
     }
 
     html {
       -webkit-text-size-adjust: 100%;
       height: 100%;
+      color-scheme: light dark;
     }
 
     body {
@@ -47,6 +78,54 @@
         max(16px, env(safe-area-inset-bottom))
         max(12px, env(safe-area-inset-left));
       padding-bottom: max(20px, calc(env(safe-area-inset-bottom) + 8px));
+    }
+
+    /* Перемикач теми */
+    .theme-bar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin: -4px 0 4px;
+      padding: 0 2px;
+    }
+    .theme-switch {
+      display: inline-flex;
+      padding: 3px;
+      border-radius: 999px;
+      background: var(--app-theme-switch-bg);
+      border: 1px solid var(--app-border);
+      gap: 2px;
+    }
+    .theme-switch button {
+      margin: 0;
+      border: none;
+      cursor: pointer;
+      font: inherit;
+      font-size: 15px;
+      line-height: 1;
+      min-width: 40px;
+      min-height: 36px;
+      border-radius: 999px;
+      padding: 8px 10px;
+      background: transparent;
+      color: var(--app-theme-switch-muted);
+      transition: background 0.2s, color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .theme-switch button[aria-pressed="true"] {
+      background: var(--app-accent);
+      color: var(--app-on-accent);
+      box-shadow: 0 1px 3px var(--app-card-shadow);
+    }
+    .theme-switch button[aria-pressed="false"]:active {
+      color: var(--app-text);
+      opacity: 0.85;
+    }
+    @media (hover: hover) {
+      .theme-switch button[aria-pressed="false"]:hover {
+        color: var(--app-text);
+      }
     }
 
     /* Логотип */
@@ -121,7 +200,7 @@
     @media (hover: hover) {
       nav button:hover { background: var(--app-accent); color: var(--app-on-accent); }
       nav button.active:hover { filter: brightness(1.05); }
-      .card button:hover { background: #003bb5; }
+      .card button:hover { background: var(--app-accent-hover); }
     }
 
     /* Сетка товаров */
@@ -181,6 +260,13 @@
   </style>
 </head>
 <body>
+  <div class="theme-bar">
+    <div class="theme-switch" role="group" aria-label="Тема оформлення">
+      <button type="button" id="theme-btn-light" data-pick-theme="light" aria-pressed="false" title="Світла тема" aria-label="Світла тема">☀</button>
+      <button type="button" id="theme-btn-dark" data-pick-theme="dark" aria-pressed="false" title="Темна тема" aria-label="Темна тема">☽</button>
+    </div>
+  </div>
+
   <!-- Логотип -->
   <div class="logo">
     <img src="img/logo.png" alt="Art Studio AI">
@@ -252,49 +338,51 @@
       });
     }
 
-    /** false = завжди брендова палітра (як у браузері). true = кольори з теми Telegram. */
-    const PALETTE_FOLLOW_TELEGRAM = false;
+    const THEME_STORAGE_KEY = 'artstudio-theme';
 
-    function tgColorToCss(value) {
-      if (!value || typeof value !== 'string') return '';
-      const v = value.replace(/^#/, '');
-      return (v.length === 6 || v.length === 8) ? '#' + v : '';
+    function systemPreferredTheme() {
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (tg && tg.colorScheme === 'dark') return 'dark';
+      if (tg && tg.colorScheme === 'light') return 'light';
+      if (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+      return 'light';
     }
 
-    function applyTelegramPalette(tg) {
-      const p = tg.themeParams;
-      if (!p) return;
-      const r = document.documentElement.style;
-      const set = (name, hex) => {
-        const c = tgColorToCss(hex);
-        if (c) r.setProperty(name, c);
-      };
-      set('--app-bg', p.bg_color);
-      set('--app-text', p.text_color);
-      set('--app-welcome', p.link_color || p.button_color);
-      set('--app-accent', p.button_color);
-      set('--app-on-accent', p.button_text_color);
-      set('--app-secondary-bg', p.secondary_bg_color);
-      set('--app-card-bg', p.section_bg_color || p.secondary_bg_color);
-      set('--app-border', p.hint_color);
-      set('--app-border-nav', p.section_separator_color || p.hint_color);
-      const bg = tgColorToCss(p.bg_color);
-      if (bg) {
-        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
+    function getStoredThemeChoice() {
+      try {
+        const v = localStorage.getItem(THEME_STORAGE_KEY);
+        return v === 'light' || v === 'dark' ? v : null;
+      } catch (e) {
+        return null;
       }
     }
 
-    function syncChromeToPalette(tg) {
+    function applyDocumentTheme(mode) {
+      const m = mode === 'dark' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', m);
+      const lightBtn = document.getElementById('theme-btn-light');
+      const darkBtn = document.getElementById('theme-btn-dark');
+      if (lightBtn) lightBtn.setAttribute('aria-pressed', m === 'light' ? 'true' : 'false');
+      if (darkBtn) darkBtn.setAttribute('aria-pressed', m === 'dark' ? 'true' : 'false');
       const bg = getComputedStyle(document.documentElement).getPropertyValue('--app-bg').trim() || '#ffffff';
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (!tg) return;
       try {
         tg.setHeaderColor(bg);
-      } catch (e) { /* старі клієнти */ }
+      } catch (e) { /* ignore */ }
       try {
-        if (typeof tg.setBackgroundColor === 'function') {
-          tg.setBackgroundColor(bg);
-        }
-      } catch (e) { /* не всі платформи */ }
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
+        if (typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor(bg);
+      } catch (e) { /* ignore */ }
+    }
+
+    function pickTheme(mode, persist) {
+      if (persist) {
+        try {
+          localStorage.setItem(THEME_STORAGE_KEY, mode);
+        } catch (e) { /* ignore */ }
+      }
+      applyDocumentTheme(mode);
     }
 
     (function initTelegram() {
@@ -302,14 +390,43 @@
       if (!tg) return;
       tg.ready();
       tg.expand();
-      if (PALETTE_FOLLOW_TELEGRAM) {
-        applyTelegramPalette(tg);
+    })();
+
+    (function initThemeControls() {
+      const lightBtn = document.getElementById('theme-btn-light');
+      const darkBtn = document.getElementById('theme-btn-dark');
+      const stored = getStoredThemeChoice();
+      const initial = stored || systemPreferredTheme();
+      applyDocumentTheme(initial);
+
+      if (lightBtn) {
+        lightBtn.addEventListener('click', () => pickTheme('light', true));
+      }
+      if (darkBtn) {
+        darkBtn.addEventListener('click', () => pickTheme('dark', true));
+      }
+
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (tg) {
         tg.onEvent('themeChanged', () => {
-          applyTelegramPalette(tg);
-          syncChromeToPalette(tg);
+          if (getStoredThemeChoice()) return;
+          applyDocumentTheme(systemPreferredTheme());
         });
       }
-      syncChromeToPalette(tg);
+
+      if (window.matchMedia) {
+        const mq = matchMedia('(prefers-color-scheme: dark)');
+        const onOsTheme = () => {
+          if (getStoredThemeChoice()) return;
+          if (window.Telegram && window.Telegram.WebApp) return;
+          applyDocumentTheme(systemPreferredTheme());
+        };
+        if (typeof mq.addEventListener === 'function') {
+          mq.addEventListener('change', onOsTheme);
+        } else {
+          mq.addListener(onOsTheme);
+        }
+      }
     })();
 
     showCategory('top');
