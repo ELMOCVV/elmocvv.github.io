@@ -303,6 +303,13 @@
       #view-product.main-view-out {
         opacity: 1 !important;
       }
+      .size-preview-wrap img {
+        transition: none !important;
+      }
+      .size-preview-wrap img.is-exiting {
+        opacity: 1 !important;
+        transform: none !important;
+      }
     }
 
     .view-hidden {
@@ -500,7 +507,14 @@
       display: block;
       width: 100%;
       height: auto;
-      transition: opacity 0.22s ease;
+      transform-origin: center center;
+      transition:
+        opacity 0.38s cubic-bezier(0.25, 0.46, 0.45, 1),
+        transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .size-preview-wrap img.is-exiting {
+      opacity: 0;
+      transform: scale(0.96) translateY(10px);
     }
 
     .product-buy {
@@ -668,6 +682,8 @@
       let selImg = 0;
       let selSize = sizes.length > 1 ? 1 : 0;
       const root = document.getElementById('product-detail-root');
+      let sizePreviewGen = 0;
+      let sizePreviewExitListener = null;
 
       function syncThumbState() {
         root.querySelectorAll('[data-thumb]').forEach((b) => {
@@ -695,30 +711,63 @@
         const nextSrc = s && s.preview;
         if (!nextSrc) return;
         if (imgEl.getAttribute('data-src-key') === nextSrc) return;
+
         const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
         if (reduceMotion) {
+          if (sizePreviewExitListener) {
+            imgEl.removeEventListener('transitionend', sizePreviewExitListener);
+            sizePreviewExitListener = null;
+          }
+          imgEl.classList.remove('is-exiting');
           imgEl.src = nextSrc;
           imgEl.setAttribute('data-src-key', nextSrc);
           imgEl.alt = `Приклад розміру ${s.label}`;
           return;
         }
-        imgEl.style.opacity = '0.65';
-        const loader = new Image();
-        loader.onload = () => {
+
+        if (sizePreviewExitListener) {
+          imgEl.removeEventListener('transitionend', sizePreviewExitListener);
+          sizePreviewExitListener = null;
+        }
+        imgEl.classList.remove('is-exiting');
+
+        const myGen = ++sizePreviewGen;
+        let loadDone = false;
+        let exitDone = false;
+
+        const tryFinish = () => {
+          if (myGen !== sizePreviewGen) return;
+          if (!loadDone || !exitDone) return;
+          if (sizePreviewExitListener) {
+            imgEl.removeEventListener('transitionend', sizePreviewExitListener);
+            sizePreviewExitListener = null;
+          }
           imgEl.src = nextSrc;
           imgEl.setAttribute('data-src-key', nextSrc);
           imgEl.alt = `Приклад розміру ${s.label}`;
-          requestAnimationFrame(() => {
-            imgEl.style.opacity = '1';
-          });
+          imgEl.classList.remove('is-exiting');
         };
-        loader.onerror = () => {
-          imgEl.src = nextSrc;
-          imgEl.setAttribute('data-src-key', nextSrc);
-          imgEl.alt = `Приклад розміру ${s.label}`;
-          imgEl.style.opacity = '1';
+
+        const loader = new Image();
+        loader.onload = loader.onerror = () => {
+          if (myGen !== sizePreviewGen) return;
+          loadDone = true;
+          tryFinish();
         };
         loader.src = nextSrc;
+
+        sizePreviewExitListener = (e) => {
+          if (myGen !== sizePreviewGen) return;
+          if (e.propertyName !== 'opacity') return;
+          exitDone = true;
+          tryFinish();
+        };
+        imgEl.addEventListener('transitionend', sizePreviewExitListener);
+
+        requestAnimationFrame(() => {
+          if (myGen !== sizePreviewGen) return;
+          imgEl.classList.add('is-exiting');
+        });
       }
 
       function swapMainImageWithFade() {
